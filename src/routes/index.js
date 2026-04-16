@@ -10,12 +10,14 @@ var unsealController = require('../modules/unseal/unseal.controller');
 var paymentController = require('../modules/payment/payment.controller');
 var adminController = require('../modules/admin/admin.controller');
 var mailController = require('../modules/mail/mail.controller');
+var radioController = require('../modules/radio/radio.controller');
 
 var router = express.Router();
 
 router.get('/health', healthController.getHealth);
 router.get('/overview', overviewController.getOverview);
 router.get('/payment-plans', paymentController.listPaymentPlans);
+router.get('/radio/stations', radioController.listStations);
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 router.get('/cron/ready-emails', cronMiddleware.requireCronSecret, mailController.processReadyEmailsCron);
