@@ -16,22 +16,49 @@ exports.listMyPayments = async function listMyPayments(req, res, next) {
   }
 };
 
-exports.createPaymentRequest = async function createPaymentRequest(req, res, next) {
+exports.getMyPayment = async function getMyPayment(req, res, next) {
   try {
-    var amount = Number(req.body.amount);
-    var note = req.body.note;
+    var paymentId = req.params.paymentId;
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      throw createError('amount must be a positive number', 400);
+    if (!paymentId) {
+      throw createError('paymentId is required', 400);
     }
 
+    res.json({
+      item: await paymentService.getPaymentForUser(req.currentUser.id, paymentId),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.createPaymentRequest = async function createPaymentRequest(req, res, next) {
+  try {
+    var note = req.body.note;
+
     var payment = await paymentService.createPaymentRequest(req.currentUser, {
-      amount: amount,
       note: typeof note === 'string' ? note.trim() : '',
     });
 
     res.status(201).json({
       item: payment,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.handleSePayWebhook = async function handleSePayWebhook(req, res, next) {
+  try {
+    var result = await paymentService.handleSePayWebhook({
+      payload: req.body,
+      authorizationHeader: req.get('Authorization') || '',
+      secretKeyHeader: req.get('X-Secret-Key') || '',
+    });
+
+    res.json({
+      success: true,
+      result: result,
     });
   } catch (error) {
     next(error);

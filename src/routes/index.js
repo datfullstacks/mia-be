@@ -18,6 +18,7 @@ router.get('/overview', overviewController.getOverview);
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 router.get('/cron/ready-emails', cronMiddleware.requireCronSecret, mailController.processReadyEmailsCron);
+router.post('/webhooks/sepay', paymentController.handleSePayWebhook);
 router.get('/auth/me', authMiddleware.requireAuth, authController.getMe);
 router.post('/auth/logout', authMiddleware.requireAuth, authMiddleware.requireCsrf, authController.logout);
 router.get('/ambers', authMiddleware.requireAuth, amberController.listAmbers);
@@ -29,6 +30,7 @@ router.post('/unseal', unsealController.unsealAmber);
 router.get('/mail-logs', authMiddleware.requireAuth, mailController.listMyMailLogs);
 router.post('/mail-logs/:mailLogId/retry', authMiddleware.requireAuth, authMiddleware.requireCsrf, mailController.retryMyMailLog);
 router.get('/payments', authMiddleware.requireAuth, paymentController.listMyPayments);
+router.get('/payments/:paymentId', authMiddleware.requireAuth, paymentController.getMyPayment);
 router.post('/payments', authMiddleware.requireAuth, authMiddleware.requireCsrf, paymentController.createPaymentRequest);
 router.get('/admin/overview', authMiddleware.requireAdmin, adminController.getAdminOverview);
 router.post(

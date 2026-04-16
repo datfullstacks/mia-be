@@ -13,8 +13,31 @@ function mapPayment(document) {
     status: document.status,
     userId: document.userId,
     createdAt: document.createdAt,
+    expiresAt: document.expiresAt || null,
+    paidAt: document.paidAt || null,
     reviewedAt: document.reviewedAt || null,
     reviewedBy: document.reviewedBy || null,
+    provider: document.provider || 'sepay_qr',
+    providerTransactionId: document.providerTransactionId || null,
+    providerPayload: document.providerPayload || null,
+    bankName: document.bankName || '',
+    accountNumber: document.accountNumber || '',
+    accountName: document.accountName || '',
+  };
+}
+
+function mapWebhookLog(document) {
+  if (!document) {
+    return null;
+  }
+
+  return {
+    id: document._id,
+    paymentRef: document.paymentRef || null,
+    transferAmount: document.transferAmount || 0,
+    transferType: document.transferType || '',
+    payload: document.payload || null,
+    receivedAt: document.receivedAt,
   };
 }
 
@@ -32,6 +55,10 @@ exports.findById = async function findById(paymentId) {
   return mapPayment(await db.getCollection('payments').findOne({ _id: paymentId }));
 };
 
+exports.findByPaymentRef = async function findByPaymentRef(paymentRef) {
+  return mapPayment(await db.getCollection('payments').findOne({ paymentRef: paymentRef }));
+};
+
 exports.count = async function count() {
   return db.getCollection('payments').countDocuments();
 };
@@ -45,8 +72,16 @@ exports.insert = async function insert(record) {
     status: record.status,
     userId: record.userId,
     createdAt: record.createdAt,
+    expiresAt: record.expiresAt || null,
+    paidAt: record.paidAt || null,
     reviewedAt: record.reviewedAt || null,
     reviewedBy: record.reviewedBy || null,
+    provider: record.provider || 'sepay_qr',
+    providerTransactionId: record.providerTransactionId || null,
+    providerPayload: record.providerPayload || null,
+    bankName: record.bankName || '',
+    accountNumber: record.accountNumber || '',
+    accountName: record.accountName || '',
   });
 
   return record;
@@ -63,11 +98,36 @@ exports.update = async function update(updatedRecord) {
         status: updatedRecord.status,
         userId: updatedRecord.userId,
         createdAt: updatedRecord.createdAt,
+        expiresAt: updatedRecord.expiresAt || null,
+        paidAt: updatedRecord.paidAt || null,
         reviewedAt: updatedRecord.reviewedAt || null,
         reviewedBy: updatedRecord.reviewedBy || null,
+        provider: updatedRecord.provider || 'sepay_qr',
+        providerTransactionId: updatedRecord.providerTransactionId || null,
+        providerPayload: updatedRecord.providerPayload || null,
+        bankName: updatedRecord.bankName || '',
+        accountNumber: updatedRecord.accountNumber || '',
+        accountName: updatedRecord.accountName || '',
       },
     },
   );
 
   return updatedRecord;
+};
+
+exports.findWebhookLogByTransactionId = async function findWebhookLogByTransactionId(transactionId) {
+  return mapWebhookLog(await db.getCollection('payment_webhook_logs').findOne({ _id: transactionId }));
+};
+
+exports.insertWebhookLog = async function insertWebhookLog(record) {
+  await db.getCollection('payment_webhook_logs').insertOne({
+    _id: record.id,
+    paymentRef: record.paymentRef || null,
+    transferAmount: record.transferAmount || 0,
+    transferType: record.transferType || '',
+    payload: record.payload || null,
+    receivedAt: record.receivedAt,
+  });
+
+  return record;
 };

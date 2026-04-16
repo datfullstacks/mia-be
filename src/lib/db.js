@@ -21,8 +21,11 @@ async function ensureIndexes() {
     database.collection('users').createIndex({ email: 1 }, { unique: true }),
     database.collection('ambers').createIndex({ code: 1 }, { unique: true }),
     database.collection('payments').createIndex({ paymentRef: 1 }, { unique: true }),
+    database.collection('payments').createIndex({ userId: 1, createdAt: -1 }),
+    database.collection('payments').createIndex({ status: 1, createdAt: -1 }),
     database.collection('mail_logs').createIndex({ amberId: 1, event: 1 }),
     database.collection('admin_action_logs').createIndex({ actionType: 1, createdAt: -1 }),
+    database.collection('payment_webhook_logs').createIndex({ paymentRef: 1, receivedAt: -1 }),
   ]);
 }
 
