@@ -43,6 +43,24 @@ function normalizePaymentRef(paymentRef) {
     .replace(/[^A-Z0-9]/g, '');
 }
 
+function extractPaymentRefFromText() {
+  for (var index = 0; index < arguments.length; index += 1) {
+    var source = String(arguments[index] || '').toUpperCase();
+
+    if (!source) {
+      continue;
+    }
+
+    var matchedRef = source.match(/MIAPRO[A-Z0-9]+/);
+
+    if (matchedRef && matchedRef[0]) {
+      return matchedRef[0];
+    }
+  }
+
+  return '';
+}
+
 function createError(message, statusCode) {
   var error = new Error(message);
   error.statusCode = statusCode;
@@ -139,13 +157,19 @@ function extractWebhookData(payload) {
   )
     .trim()
     .toLowerCase();
-  var paymentRef = String(
+  var rawPaymentRef = String(
     payload.code ||
       payload.payment_code ||
       order.order_invoice_number ||
       order.order_id ||
       '',
   ).trim();
+  var paymentRef = rawPaymentRef || extractPaymentRefFromText(
+    payload.content,
+    payload.description,
+    transaction.description,
+    transaction.content,
+  );
   var amount = Number(
     payload.transferAmount ||
       payload.transfer_amount ||
