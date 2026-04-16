@@ -16,7 +16,7 @@ exports.getOverview = async function getOverview(_req, res, next) {
       modules: [
         'Gate auth shell',
         'Interactive room',
-        'Seal / Unseal / History / Wallet / Settings',
+        'Seal / Unseal / History / Pricing / Settings',
         'Express auth, amber, payment, and admin routes',
       ],
       roadmap: [
