@@ -7,6 +7,7 @@ var paymentStore = require('./payment.store');
 
 var env = getEnv();
 var SUCCESS_STATUSES = ['paid', 'approved_manual'];
+var historicalRefsSynced = false;
 
 function getProPlanAmount() {
   var amount = Number.parseInt(env.proPlanAmount, 10);
@@ -29,12 +30,17 @@ function getPaymentExpiryMinutes() {
 }
 
 function createPaymentRef() {
-  return [
-    'MIA',
-    'PRO',
-    Date.now().toString(36).toUpperCase(),
-    crypto.randomBytes(3).toString('hex').toUpperCase(),
-  ].join('-');
+  return (
+    'MIAPRO' +
+    Date.now().toString(36).toUpperCase() +
+    crypto.randomBytes(3).toString('hex').toUpperCase()
+  );
+}
+
+function normalizePaymentRef(paymentRef) {
+  return String(paymentRef || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 function createError(message, statusCode) {
@@ -199,6 +205,7 @@ async function syncPaymentExpiry(payment) {
   return paymentStore.update({
     id: payment.id,
     paymentRef: payment.paymentRef,
+    paymentRefNormalized: payment.paymentRefNormalized || normalizePaymentRef(payment.paymentRef),
     amount: payment.amount,
     note: payment.note,
     status: 'expired',
@@ -250,6 +257,22 @@ async function recordWebhook(event, payload) {
   }
 }
 
+async function findPaymentByWebhookRef(paymentRef) {
+  var exactPayment = await paymentStore.findByPaymentRef(paymentRef);
+
+  if (exactPayment) {
+    return exactPayment;
+  }
+
+  var normalizedRef = normalizePaymentRef(paymentRef);
+
+  if (!normalizedRef) {
+    return null;
+  }
+
+  return paymentStore.findByPaymentRefNormalized(normalizedRef);
+}
+
 function assertPaymentOwnership(payment, userId) {
   if (!payment || payment.userId !== userId) {
     throw createError('Payment request not found', 404);
@@ -295,9 +318,11 @@ exports.createPaymentRequest = async function createPaymentRequest(user, payload
   }
 
   var now = Date.now();
+  var paymentRef = createPaymentRef();
   var record = await paymentStore.insert({
     id: crypto.randomUUID(),
-    paymentRef: createPaymentRef(),
+    paymentRef: paymentRef,
+    paymentRefNormalized: normalizePaymentRef(paymentRef),
     amount: getProPlanAmount(),
     note: payload.note || '',
     status: 'pending',
@@ -333,6 +358,7 @@ exports.approvePayment = async function approvePayment(paymentId, adminUserId) {
   var updatedPayment = await paymentStore.update({
     id: payment.id,
     paymentRef: payment.paymentRef,
+    paymentRefNormalized: payment.paymentRefNormalized || normalizePaymentRef(payment.paymentRef),
     amount: payment.amount,
     note: payment.note,
     status: 'approved_manual',
@@ -397,7 +423,7 @@ exports.handleSePayWebhook = async function handleSePayWebhook(options) {
     };
   }
 
-  var payment = await paymentStore.findByPaymentRef(event.paymentRef);
+  var payment = await findPaymentByWebhookRef(event.paymentRef);
 
   if (!payment) {
     await recordWebhook(event, options.payload);
@@ -424,6 +450,7 @@ exports.handleSePayWebhook = async function handleSePayWebhook(options) {
     var completedPayment = await paymentStore.update({
       id: payment.id,
       paymentRef: payment.paymentRef,
+      paymentRefNormalized: payment.paymentRefNormalized || normalizePaymentRef(payment.paymentRef),
       amount: payment.amount,
       note: payment.note,
       status: 'paid',
@@ -454,6 +481,7 @@ exports.handleSePayWebhook = async function handleSePayWebhook(options) {
   var reviewPayment = await paymentStore.update({
     id: payment.id,
     paymentRef: payment.paymentRef,
+    paymentRefNormalized: payment.paymentRefNormalized || normalizePaymentRef(payment.paymentRef),
     amount: payment.amount,
     note: payment.note,
     status: 'pending_review',
@@ -508,4 +536,14 @@ exports.listAllPayments = async function listAllPayments(options) {
   });
 
   return pagination.paginateItems(items, paging);
+};
+
+exports.syncHistoricalPaymentRefs = async function syncHistoricalPaymentRefs() {
+  if (historicalRefsSynced) {
+    return 0;
+  }
+
+  var syncedCount = await paymentStore.backfillPaymentRefNormalized(normalizePaymentRef);
+  historicalRefsSynced = true;
+  return syncedCount;
 };

@@ -8,6 +8,7 @@ function mapPayment(document) {
   return {
     id: document._id,
     paymentRef: document.paymentRef,
+    paymentRefNormalized: document.paymentRefNormalized || null,
     amount: document.amount,
     note: document.note,
     status: document.status,
@@ -59,6 +60,12 @@ exports.findByPaymentRef = async function findByPaymentRef(paymentRef) {
   return mapPayment(await db.getCollection('payments').findOne({ paymentRef: paymentRef }));
 };
 
+exports.findByPaymentRefNormalized = async function findByPaymentRefNormalized(paymentRefNormalized) {
+  return mapPayment(
+    await db.getCollection('payments').findOne({ paymentRefNormalized: paymentRefNormalized }),
+  );
+};
+
 exports.count = async function count() {
   return db.getCollection('payments').countDocuments();
 };
@@ -67,6 +74,7 @@ exports.insert = async function insert(record) {
   await db.getCollection('payments').insertOne({
     _id: record.id,
     paymentRef: record.paymentRef,
+    paymentRefNormalized: record.paymentRefNormalized || null,
     amount: record.amount,
     note: record.note,
     status: record.status,
@@ -93,6 +101,7 @@ exports.update = async function update(updatedRecord) {
     {
       $set: {
         paymentRef: updatedRecord.paymentRef,
+        paymentRefNormalized: updatedRecord.paymentRefNormalized || null,
         amount: updatedRecord.amount,
         note: updatedRecord.note,
         status: updatedRecord.status,
@@ -113,6 +122,33 @@ exports.update = async function update(updatedRecord) {
   );
 
   return updatedRecord;
+};
+
+exports.backfillPaymentRefNormalized = async function backfillPaymentRefNormalized(normalizePaymentRef) {
+  var collection = db.getCollection('payments');
+  var documents = await collection.find({}).toArray();
+  var syncedCount = 0;
+
+  for (var index = 0; index < documents.length; index += 1) {
+    var document = documents[index];
+    var nextNormalized = normalizePaymentRef(document.paymentRef || '');
+
+    if (!nextNormalized || document.paymentRefNormalized === nextNormalized) {
+      continue;
+    }
+
+    await collection.updateOne(
+      { _id: document._id },
+      {
+        $set: {
+          paymentRefNormalized: nextNormalized,
+        },
+      },
+    );
+    syncedCount += 1;
+  }
+
+  return syncedCount;
 };
 
 exports.findWebhookLogByTransactionId = async function findWebhookLogByTransactionId(transactionId) {

@@ -8,6 +8,7 @@ var app = require('../app');
 var debug = require('debug')('backend:server');
 var http = require('http');
 var db = require('../src/lib/db');
+var paymentService = require('../src/modules/payment/payment.service');
 
 /**
  * Get port from environment and store in Express.
@@ -83,6 +84,7 @@ function onListening() {
 async function start() {
   try {
     await db.connectToDatabase();
+    await paymentService.syncHistoricalPaymentRefs();
     server = http.createServer(app);
     server.listen(port);
     server.on('error', onError);
