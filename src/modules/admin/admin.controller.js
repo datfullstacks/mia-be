@@ -87,7 +87,13 @@ exports.approvePayment = async function approvePayment(req, res, next) {
       actionType: 'approve_payment',
       targetType: 'payment',
       targetId: payment.id,
-      summary: 'Manually approved ' + payment.paymentRef + ' and upgraded user ' + payment.userId + ' to Pro',
+      summary:
+        'Manually approved ' +
+        payment.paymentRef +
+        ' and added ' +
+        payment.amberCredits +
+        ' amber to user ' +
+        payment.userId,
     });
 
     res.json({

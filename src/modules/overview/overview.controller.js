@@ -21,7 +21,7 @@ exports.getOverview = async function getOverview(_req, res, next) {
       ],
       roadmap: [
         'Finalize MongoDB Atlas deployment and secret management',
-        'Harden durable sessions and user tier upgrades',
+        'Harden durable sessions and amber package accounting',
         'Add sender edit/cancel flows',
         'Integrate email delivery',
         'Add mail logs and durable admin audit trail',

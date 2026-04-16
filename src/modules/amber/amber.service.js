@@ -2,6 +2,7 @@ var crypto = require('crypto');
 var amberStore = require('./amber.store');
 var mailService = require('../mail/mail.service');
 var pagination = require('../../lib/pagination');
+var quotaService = require('../quota/quota.service');
 var security = require('../../lib/security');
 
 function getComputedStatus(amber) {
@@ -103,6 +104,16 @@ exports.listAmbersForUser = async function listAmbersForUser(userId, options) {
 };
 
 exports.createAmber = async function createAmber(payload) {
+  if (!payload.isAdmin) {
+    var quota = await quotaService.getQuotaForUser(payload.senderUserId);
+
+    if (quota.remainingCredits < 1) {
+      var quotaError = new Error('No amber remaining. Buy another package to keep sealing.');
+      quotaError.statusCode = 409;
+      throw quotaError;
+    }
+  }
+
   var nextNumber = (await amberStore.count()) + 1;
   var record = {
     id: crypto.randomUUID(),

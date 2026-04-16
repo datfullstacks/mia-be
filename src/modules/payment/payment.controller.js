@@ -16,6 +16,16 @@ exports.listMyPayments = async function listMyPayments(req, res, next) {
   }
 };
 
+exports.listPaymentPlans = function listPaymentPlans(_req, res, next) {
+  try {
+    res.json({
+      items: paymentService.getPaymentPlans(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.getMyPayment = async function getMyPayment(req, res, next) {
   try {
     var paymentId = req.params.paymentId;
@@ -35,9 +45,11 @@ exports.getMyPayment = async function getMyPayment(req, res, next) {
 exports.createPaymentRequest = async function createPaymentRequest(req, res, next) {
   try {
     var note = req.body.note;
+    var planId = req.body.planId;
 
     var payment = await paymentService.createPaymentRequest(req.currentUser, {
       note: typeof note === 'string' ? note.trim() : '',
+      planId: typeof planId === 'string' ? planId.trim() : '',
     });
 
     res.status(201).json({

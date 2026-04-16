@@ -62,6 +62,7 @@ exports.createAmber = async function createAmber(req, res, next) {
 
     var amber = await amberService.createAmber({
       senderUserId: req.currentUser.id,
+      isAdmin: Boolean(req.currentUser.isAdmin),
       recipientEmail: recipientEmail.trim(),
       message: message.trim(),
       openAt: new Date(openAt).toISOString(),

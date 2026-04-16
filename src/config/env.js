@@ -8,7 +8,6 @@ module.exports = function getEnv() {
     mongoDbName: process.env.MONGODB_DB_NAME || '',
     resendApiKey: process.env.RESEND_API_KEY || '',
     mailFrom: process.env.MAIL_FROM || 'MIA <onboarding@resend.dev>',
-    proPlanAmount: process.env.PRO_PLAN_AMOUNT || '99000',
     paymentExpiryMinutes: process.env.PAYMENT_EXPIRY_MINUTES || '15',
     sepayBankName: process.env.SEPAY_BANK_NAME || '',
     sepayBankAccount: process.env.SEPAY_BANK_ACCOUNT || '',

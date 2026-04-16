@@ -2,23 +2,13 @@ var crypto = require('crypto');
 
 var getEnv = require('../../config/env');
 var pagination = require('../../lib/pagination');
-var authService = require('../auth/auth.service');
 var paymentStore = require('./payment.store');
+var paymentPlans = require('./payment-plans');
 
 var env = getEnv();
 var SUCCESS_STATUSES = ['paid', 'approved_manual'];
 var historicalRefsSynced = false;
 var historicalPaymentsReconciled = false;
-
-function getProPlanAmount() {
-  var amount = Number.parseInt(env.proPlanAmount, 10);
-
-  if (!Number.isInteger(amount) || amount <= 0) {
-    return 99000;
-  }
-
-  return amount;
-}
 
 function getPaymentExpiryMinutes() {
   var minutes = Number.parseInt(env.paymentExpiryMinutes, 10);
@@ -32,7 +22,7 @@ function getPaymentExpiryMinutes() {
 
 function createPaymentRef() {
   return (
-    'MIAPRO' +
+    'MIAAMBER' +
     Date.now().toString(36).toUpperCase() +
     crypto.randomBytes(3).toString('hex').toUpperCase()
   );
@@ -47,12 +37,13 @@ function normalizePaymentRef(paymentRef) {
 function extractPaymentRefFromText() {
   for (var index = 0; index < arguments.length; index += 1) {
     var source = String(arguments[index] || '').toUpperCase();
+    var normalizedSource = source.replace(/[^A-Z0-9]/g, '');
 
-    if (!source) {
+    if (!normalizedSource) {
       continue;
     }
 
-    var matchedRef = source.match(/MIAPRO[A-Z0-9]+/);
+    var matchedRef = normalizedSource.match(/MIA(?:PRO|AMBER)[A-Z0-9]+/);
 
     if (matchedRef && matchedRef[0]) {
       return matchedRef[0];
@@ -78,6 +69,24 @@ function buildPaymentReviewDetail(expectedAmount, receivedAmount) {
   );
 }
 
+function getPaymentPlanSnapshot(amount) {
+  var plan = paymentPlans.findPaymentPlanByAmount(amount);
+
+  if (!plan) {
+    return {
+      planId: 'custom',
+      planLabel: 'Custom amount',
+      amberCredits: 0,
+    };
+  }
+
+  return {
+    planId: plan.id,
+    planLabel: plan.label,
+    amberCredits: plan.amberCredits,
+  };
+}
+
 function buildQrUrl(record) {
   return (
     'https://qr.sepay.vn/img?acc=' +
@@ -101,9 +110,14 @@ function ensurePaymentConfig() {
 }
 
 function mapPayment(record) {
+  var planSnapshot = getPaymentPlanSnapshot(record.amount);
+
   return {
     id: record.id,
     paymentRef: record.paymentRef,
+    planId: planSnapshot.planId,
+    planLabel: planSnapshot.planLabel,
+    amberCredits: planSnapshot.amberCredits,
     amount: record.amount,
     note: record.note,
     status: record.status,
@@ -273,10 +287,30 @@ async function syncPaymentsExpiry(payments) {
   );
 }
 
-async function activateProForUser(userId) {
-  if (await authService.getUserRecordById(userId)) {
-    await authService.updateUserTier(userId, 'pro');
-  }
+async function expirePayment(payment) {
+  return paymentStore.update({
+    id: payment.id,
+    paymentRef: payment.paymentRef,
+    paymentRefNormalized: payment.paymentRefNormalized || normalizePaymentRef(payment.paymentRef),
+    amount: payment.amount,
+    note: payment.note,
+    status: 'expired',
+    userId: payment.userId,
+    createdAt: payment.createdAt,
+    expiresAt: payment.expiresAt || null,
+    paidAt: payment.paidAt || null,
+    reviewedAt: payment.reviewedAt || null,
+    reviewedBy: payment.reviewedBy || null,
+    provider: payment.provider || 'sepay_qr',
+    providerTransactionId: payment.providerTransactionId || null,
+    providerPayload: payment.providerPayload || null,
+    lastTransferAmount: payment.lastTransferAmount || null,
+    lastTransferAt: payment.lastTransferAt || null,
+    statusDetail: payment.statusDetail || null,
+    bankName: payment.bankName || '',
+    accountNumber: payment.accountNumber || '',
+    accountName: payment.accountName || '',
+  });
 }
 
 async function recordWebhook(event, payload) {
@@ -325,7 +359,6 @@ async function completePaymentFromEvent(payment, event, payload, receivedAt) {
     accountName: payment.accountName || '',
   });
 
-  await activateProForUser(payment.userId);
   return completedPayment;
 }
 
@@ -395,9 +428,10 @@ exports.getPaymentForUser = async function getPaymentForUser(userId, paymentId) 
 
 exports.createPaymentRequest = async function createPaymentRequest(user, payload) {
   ensurePaymentConfig();
+  var selectedPlan = paymentPlans.findPaymentPlanById(payload.planId);
 
-  if (user.tier === 'pro') {
-    throw createError('This account is already on the Pro tier', 409);
+  if (!selectedPlan) {
+    throw createError('Selected pricing package is invalid', 400);
   }
 
   var userPayments = (await syncPaymentsExpiry(await paymentStore.getAll())).filter(function (payment) {
@@ -412,7 +446,11 @@ exports.createPaymentRequest = async function createPaymentRequest(user, payload
     });
 
   if (existingPending) {
-    return mapPayment(existingPending);
+    if (existingPending.amount === selectedPlan.amount) {
+      return mapPayment(existingPending);
+    }
+
+    await expirePayment(existingPending);
   }
 
   var now = Date.now();
@@ -421,7 +459,7 @@ exports.createPaymentRequest = async function createPaymentRequest(user, payload
     id: crypto.randomUUID(),
     paymentRef: paymentRef,
     paymentRefNormalized: normalizePaymentRef(paymentRef),
-    amount: getProPlanAmount(),
+    amount: selectedPlan.amount,
     note: payload.note || '',
     status: 'pending',
     userId: user.id,
@@ -479,8 +517,6 @@ exports.approvePayment = async function approvePayment(paymentId, adminUserId) {
     accountNumber: payment.accountNumber || '',
     accountName: payment.accountName || '',
   });
-
-  await activateProForUser(payment.userId);
 
   return mapPayment(updatedPayment);
 };
@@ -609,6 +645,10 @@ exports.listAllPayments = async function listAllPayments(options) {
   });
 
   return pagination.paginateItems(items, paging);
+};
+
+exports.getPaymentPlans = function getPaymentPlans() {
+  return paymentPlans.getPaymentPlans();
 };
 
 exports.syncHistoricalPaymentRefs = async function syncHistoricalPaymentRefs() {

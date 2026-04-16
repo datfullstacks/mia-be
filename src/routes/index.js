@@ -15,6 +15,7 @@ var router = express.Router();
 
 router.get('/health', healthController.getHealth);
 router.get('/overview', overviewController.getOverview);
+router.get('/payment-plans', paymentController.listPaymentPlans);
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 router.get('/cron/ready-emails', cronMiddleware.requireCronSecret, mailController.processReadyEmailsCron);

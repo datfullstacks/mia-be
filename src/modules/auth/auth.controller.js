@@ -1,5 +1,6 @@
 var authService = require('./auth.service');
 var getEnv = require('../../config/env');
+var quotaService = require('../quota/quota.service');
 var security = require('../../lib/security');
 
 var env = getEnv();
@@ -80,10 +81,12 @@ exports.register = async function register(req, res, next) {
       password: password,
     });
 
+    var userWithQuota = await quotaService.attachQuotaToUser(result.user);
+
     setSessionCookie(res, result.token);
     res.status(201).json({
       token: result.token,
-      user: result.user,
+      user: userWithQuota,
       csrfToken: ensureCsrfToken(req, res),
     });
   } catch (error) {
@@ -109,10 +112,12 @@ exports.login = async function login(req, res, next) {
       password: password,
     });
 
+    var userWithQuota = await quotaService.attachQuotaToUser(result.user);
+
     setSessionCookie(res, result.token);
     res.json({
       token: result.token,
-      user: result.user,
+      user: userWithQuota,
       csrfToken: ensureCsrfToken(req, res),
     });
   } catch (error) {
@@ -120,14 +125,16 @@ exports.login = async function login(req, res, next) {
   }
 };
 
-exports.getMe = function getMe(req, res, next) {
+exports.getMe = async function getMe(req, res, next) {
   try {
     if (!req.currentUser) {
       throw createError('Authentication required', 401);
     }
 
+    var userWithQuota = await quotaService.attachQuotaToUser(req.currentUser);
+
     res.json({
-      user: req.currentUser,
+      user: userWithQuota,
       csrfToken: ensureCsrfToken(req, res),
     });
   } catch (error) {
