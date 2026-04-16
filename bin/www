@@ -85,6 +85,7 @@ async function start() {
   try {
     await db.connectToDatabase();
     await paymentService.syncHistoricalPaymentRefs();
+    await paymentService.reconcilePaymentsFromWebhookLogs();
     server = http.createServer(app);
     server.listen(port);
     server.on('error', onError);

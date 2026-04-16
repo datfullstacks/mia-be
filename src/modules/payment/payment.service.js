@@ -8,6 +8,7 @@ var paymentStore = require('./payment.store');
 var env = getEnv();
 var SUCCESS_STATUSES = ['paid', 'approved_manual'];
 var historicalRefsSynced = false;
+var historicalPaymentsReconciled = false;
 
 function getProPlanAmount() {
   var amount = Number.parseInt(env.proPlanAmount, 10);
@@ -67,6 +68,16 @@ function createError(message, statusCode) {
   return error;
 }
 
+function buildPaymentReviewDetail(expectedAmount, receivedAmount) {
+  return (
+    'Received ' +
+    Number(receivedAmount || 0).toLocaleString('vi-VN') +
+    ' VND, expected ' +
+    Number(expectedAmount || 0).toLocaleString('vi-VN') +
+    ' VND.'
+  );
+}
+
 function buildQrUrl(record) {
   return (
     'https://qr.sepay.vn/img?acc=' +
@@ -104,6 +115,9 @@ function mapPayment(record) {
     reviewedBy: record.reviewedBy || null,
     provider: record.provider || 'sepay_qr',
     providerTransactionId: record.providerTransactionId || null,
+    lastTransferAmount: record.lastTransferAmount || null,
+    lastTransferAt: record.lastTransferAt || null,
+    statusDetail: record.statusDetail || null,
     bankName: record.bankName || '',
     accountNumber: record.accountNumber || '',
     accountName: record.accountName || '',
@@ -242,6 +256,9 @@ async function syncPaymentExpiry(payment) {
     provider: payment.provider || 'sepay_qr',
     providerTransactionId: payment.providerTransactionId || null,
     providerPayload: payment.providerPayload || null,
+    lastTransferAmount: payment.lastTransferAmount || null,
+    lastTransferAt: payment.lastTransferAt || null,
+    statusDetail: payment.statusDetail || null,
     bankName: payment.bankName || '',
     accountNumber: payment.accountNumber || '',
     accountName: payment.accountName || '',
@@ -279,6 +296,63 @@ async function recordWebhook(event, payload) {
 
     throw error;
   }
+}
+
+async function completePaymentFromEvent(payment, event, payload, receivedAt) {
+  var paidAt = payment.paidAt || receivedAt || new Date().toISOString();
+
+  var completedPayment = await paymentStore.update({
+    id: payment.id,
+    paymentRef: payment.paymentRef,
+    paymentRefNormalized: payment.paymentRefNormalized || normalizePaymentRef(payment.paymentRef),
+    amount: payment.amount,
+    note: payment.note,
+    status: 'paid',
+    userId: payment.userId,
+    createdAt: payment.createdAt,
+    expiresAt: payment.expiresAt || null,
+    paidAt: paidAt,
+    reviewedAt: payment.reviewedAt || null,
+    reviewedBy: payment.reviewedBy || null,
+    provider: payment.provider || 'sepay_qr',
+    providerTransactionId: event.transactionId,
+    providerPayload: payload,
+    lastTransferAmount: event.transferAmount || null,
+    lastTransferAt: receivedAt || new Date().toISOString(),
+    statusDetail: null,
+    bankName: payment.bankName || '',
+    accountNumber: payment.accountNumber || '',
+    accountName: payment.accountName || '',
+  });
+
+  await activateProForUser(payment.userId);
+  return completedPayment;
+}
+
+async function markPaymentForReview(payment, event, payload, receivedAt) {
+  return paymentStore.update({
+    id: payment.id,
+    paymentRef: payment.paymentRef,
+    paymentRefNormalized: payment.paymentRefNormalized || normalizePaymentRef(payment.paymentRef),
+    amount: payment.amount,
+    note: payment.note,
+    status: 'pending_review',
+    userId: payment.userId,
+    createdAt: payment.createdAt,
+    expiresAt: payment.expiresAt || null,
+    paidAt: payment.paidAt || null,
+    reviewedAt: payment.reviewedAt || null,
+    reviewedBy: payment.reviewedBy || null,
+    provider: payment.provider || 'sepay_qr',
+    providerTransactionId: event.transactionId,
+    providerPayload: payload,
+    lastTransferAmount: event.transferAmount || null,
+    lastTransferAt: receivedAt || new Date().toISOString(),
+    statusDetail: buildPaymentReviewDetail(payment.amount, event.transferAmount),
+    bankName: payment.bankName || '',
+    accountNumber: payment.accountNumber || '',
+    accountName: payment.accountName || '',
+  });
 }
 
 async function findPaymentByWebhookRef(paymentRef) {
@@ -359,6 +433,9 @@ exports.createPaymentRequest = async function createPaymentRequest(user, payload
     provider: 'sepay_qr',
     providerTransactionId: null,
     providerPayload: null,
+    lastTransferAmount: null,
+    lastTransferAt: null,
+    statusDetail: null,
     bankName: env.sepayBankName,
     accountNumber: env.sepayBankAccount,
     accountName: env.sepayAccountName,
@@ -395,6 +472,9 @@ exports.approvePayment = async function approvePayment(paymentId, adminUserId) {
     provider: payment.provider || 'sepay_qr',
     providerTransactionId: payment.providerTransactionId || null,
     providerPayload: payment.providerPayload || null,
+    lastTransferAmount: payment.lastTransferAmount || null,
+    lastTransferAt: payment.lastTransferAt || null,
+    statusDetail: payment.statusDetail || null,
     bankName: payment.bankName || '',
     accountNumber: payment.accountNumber || '',
     accountName: payment.accountName || '',
@@ -470,29 +550,12 @@ exports.handleSePayWebhook = async function handleSePayWebhook(options) {
   }
 
   if (event.transferAmount >= payment.amount) {
-    var paidAt = new Date().toISOString();
-    var completedPayment = await paymentStore.update({
-      id: payment.id,
-      paymentRef: payment.paymentRef,
-      paymentRefNormalized: payment.paymentRefNormalized || normalizePaymentRef(payment.paymentRef),
-      amount: payment.amount,
-      note: payment.note,
-      status: 'paid',
-      userId: payment.userId,
-      createdAt: payment.createdAt,
-      expiresAt: payment.expiresAt || null,
-      paidAt: payment.paidAt || paidAt,
-      reviewedAt: payment.reviewedAt || null,
-      reviewedBy: payment.reviewedBy || null,
-      provider: payment.provider || 'sepay_qr',
-      providerTransactionId: event.transactionId,
-      providerPayload: options.payload,
-      bankName: payment.bankName || '',
-      accountNumber: payment.accountNumber || '',
-      accountName: payment.accountName || '',
-    });
-
-    await activateProForUser(payment.userId);
+    var completedPayment = await completePaymentFromEvent(
+      payment,
+      event,
+      options.payload,
+      new Date().toISOString(),
+    );
     await recordWebhook(event, options.payload);
 
     return {
@@ -502,26 +565,12 @@ exports.handleSePayWebhook = async function handleSePayWebhook(options) {
     };
   }
 
-  var reviewPayment = await paymentStore.update({
-    id: payment.id,
-    paymentRef: payment.paymentRef,
-    paymentRefNormalized: payment.paymentRefNormalized || normalizePaymentRef(payment.paymentRef),
-    amount: payment.amount,
-    note: payment.note,
-    status: 'pending_review',
-    userId: payment.userId,
-    createdAt: payment.createdAt,
-    expiresAt: payment.expiresAt || null,
-    paidAt: payment.paidAt || null,
-    reviewedAt: payment.reviewedAt || null,
-    reviewedBy: payment.reviewedBy || null,
-    provider: payment.provider || 'sepay_qr',
-    providerTransactionId: event.transactionId,
-    providerPayload: options.payload,
-    bankName: payment.bankName || '',
-    accountNumber: payment.accountNumber || '',
-    accountName: payment.accountName || '',
-  });
+  var reviewPayment = await markPaymentForReview(
+    payment,
+    event,
+    options.payload,
+    new Date().toISOString(),
+  );
   await recordWebhook(event, options.payload);
 
   return {
@@ -570,4 +619,40 @@ exports.syncHistoricalPaymentRefs = async function syncHistoricalPaymentRefs() {
   var syncedCount = await paymentStore.backfillPaymentRefNormalized(normalizePaymentRef);
   historicalRefsSynced = true;
   return syncedCount;
+};
+
+exports.reconcilePaymentsFromWebhookLogs = async function reconcilePaymentsFromWebhookLogs() {
+  if (historicalPaymentsReconciled) {
+    return 0;
+  }
+
+  var logs = await paymentStore.getWebhookLogs();
+  var updatedCount = 0;
+
+  for (var index = 0; index < logs.length; index += 1) {
+    var log = logs[index];
+    var event = extractWebhookData(log.payload || {});
+
+    if (!event.isIncoming || !event.paymentRef) {
+      continue;
+    }
+
+    var payment = await findPaymentByWebhookRef(event.paymentRef);
+
+    if (!payment || SUCCESS_STATUSES.includes(payment.status)) {
+      continue;
+    }
+
+    if (event.transferAmount >= payment.amount) {
+      await completePaymentFromEvent(payment, event, log.payload || {}, log.receivedAt);
+      updatedCount += 1;
+      continue;
+    }
+
+    await markPaymentForReview(payment, event, log.payload || {}, log.receivedAt);
+    updatedCount += 1;
+  }
+
+  historicalPaymentsReconciled = true;
+  return updatedCount;
 };

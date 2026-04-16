@@ -21,6 +21,9 @@ function mapPayment(document) {
     provider: document.provider || 'sepay_qr',
     providerTransactionId: document.providerTransactionId || null,
     providerPayload: document.providerPayload || null,
+    lastTransferAmount: document.lastTransferAmount || null,
+    lastTransferAt: document.lastTransferAt || null,
+    statusDetail: document.statusDetail || null,
     bankName: document.bankName || '',
     accountNumber: document.accountNumber || '',
     accountName: document.accountName || '',
@@ -49,6 +52,16 @@ exports.getAll = async function getAll() {
     .toArray()
     .then(function (documents) {
       return documents.map(mapPayment);
+    });
+};
+
+exports.getWebhookLogs = async function getWebhookLogs() {
+  return db
+    .getCollection('payment_webhook_logs')
+    .find({}, { sort: { receivedAt: -1 } })
+    .toArray()
+    .then(function (documents) {
+      return documents.map(mapWebhookLog);
     });
 };
 
@@ -87,6 +100,9 @@ exports.insert = async function insert(record) {
     provider: record.provider || 'sepay_qr',
     providerTransactionId: record.providerTransactionId || null,
     providerPayload: record.providerPayload || null,
+    lastTransferAmount: record.lastTransferAmount || null,
+    lastTransferAt: record.lastTransferAt || null,
+    statusDetail: record.statusDetail || null,
     bankName: record.bankName || '',
     accountNumber: record.accountNumber || '',
     accountName: record.accountName || '',
@@ -114,6 +130,9 @@ exports.update = async function update(updatedRecord) {
         provider: updatedRecord.provider || 'sepay_qr',
         providerTransactionId: updatedRecord.providerTransactionId || null,
         providerPayload: updatedRecord.providerPayload || null,
+        lastTransferAmount: updatedRecord.lastTransferAmount || null,
+        lastTransferAt: updatedRecord.lastTransferAt || null,
+        statusDetail: updatedRecord.statusDetail || null,
         bankName: updatedRecord.bankName || '',
         accountNumber: updatedRecord.accountNumber || '',
         accountName: updatedRecord.accountName || '',
