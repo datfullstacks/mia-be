@@ -4,6 +4,7 @@ var mailProvider = require('./mail.provider');
 var amberStore = require('../amber/amber.store');
 var mailTemplates = require('./mail.templates');
 var pagination = require('../../lib/pagination');
+var timeRange = require('../../lib/time-range');
 
 function mapMailLog(record) {
   return {
@@ -266,8 +267,11 @@ exports.retryMailLogForUser = async function retryMailLogForUser(userId, mailLog
   return exports.retryMailLog(mailLogId);
 };
 
-exports.getMailStats = async function getMailStats() {
-  var logs = await mailStore.getAll();
+exports.getMailStats = async function getMailStats(options) {
+  var range = timeRange.resolveRange(options && options.period);
+  var logs = (await mailStore.getAll()).filter(function (log) {
+    return timeRange.isWithinRange(log.createdAt, range);
+  });
 
   return {
     totalLogs: logs.length,

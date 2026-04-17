@@ -1,6 +1,7 @@
 var crypto = require('crypto');
 var authStore = require('./auth.store');
 var security = require('../../lib/security');
+var timeRange = require('../../lib/time-range');
 
 function sanitizeUser(user) {
   return {
@@ -102,8 +103,11 @@ exports.logout = async function logout(token) {
   await authStore.deleteSession(token);
 };
 
-exports.getUserStats = async function getUserStats() {
-  var users = await authStore.getUsers();
+exports.getUserStats = async function getUserStats(options) {
+  var range = timeRange.resolveRange(options && options.period);
+  var users = (await authStore.getUsers()).filter(function (user) {
+    return timeRange.isWithinRange(user.createdAt, range);
+  });
 
   return {
     totalUsers: users.length,

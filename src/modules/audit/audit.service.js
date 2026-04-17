@@ -1,6 +1,7 @@
 var crypto = require('crypto');
 var auditStore = require('./audit.store');
 var pagination = require('../../lib/pagination');
+var timeRange = require('../../lib/time-range');
 
 function filterActionLogs(logs, options) {
   var actionType = options && options.actionType ? String(options.actionType).toLowerCase() : 'all';
@@ -54,8 +55,13 @@ exports.listActionLogs = async function listActionLogs(options) {
   return pagination.paginateItems(items, paging);
 };
 
-exports.getActionStats = async function getActionStats() {
+exports.getActionStats = async function getActionStats(options) {
+  var range = timeRange.resolveRange(options && options.period);
+  var logs = (await auditStore.getAll()).filter(function (log) {
+    return timeRange.isWithinRange(log.createdAt, range);
+  });
+
   return {
-    totalActionLogs: (await auditStore.getAll()).length,
+    totalActionLogs: logs.length,
   };
 };

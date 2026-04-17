@@ -4,6 +4,7 @@ var getEnv = require('../../config/env');
 var pagination = require('../../lib/pagination');
 var paymentStore = require('./payment.store');
 var paymentPlans = require('./payment-plans');
+var timeRange = require('../../lib/time-range');
 
 var env = getEnv();
 var SUCCESS_STATUSES = ['paid', 'approved_manual'];
@@ -616,8 +617,11 @@ exports.handleSePayWebhook = async function handleSePayWebhook(options) {
   };
 };
 
-exports.getPaymentStats = async function getPaymentStats() {
-  var payments = await syncPaymentsExpiry(await paymentStore.getAll());
+exports.getPaymentStats = async function getPaymentStats(options) {
+  var range = timeRange.resolveRange(options && options.period);
+  var payments = (await syncPaymentsExpiry(await paymentStore.getAll())).filter(function (payment) {
+    return timeRange.isWithinRange(payment.createdAt, range);
+  });
 
   return {
     totalPayments: payments.length,

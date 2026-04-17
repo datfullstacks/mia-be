@@ -16,6 +16,7 @@ function parsePositiveInteger(value, fallback) {
 
 exports.getAdminOverview = async function getAdminOverview(req, res, next) {
   try {
+    var statsPeriod = req.query.statsPeriod;
     var amberResult = await amberService.listAmberMetadata({
       includeArchived: req.query.includeArchived !== 'false',
       status: req.query.amberStatus,
@@ -43,14 +44,15 @@ exports.getAdminOverview = async function getAdminOverview(req, res, next) {
       pageSize: parsePositiveInteger(req.query.actionPageSize, 5),
     });
     var stats = await Promise.all([
-      authService.getUserStats(),
-      amberService.getAmberStats(),
-      paymentService.getPaymentStats(),
-      mailService.getMailStats(),
-      auditService.getActionStats(),
+      authService.getUserStats({ period: statsPeriod }),
+      amberService.getAmberStats({ period: statsPeriod }),
+      paymentService.getPaymentStats({ period: statsPeriod }),
+      mailService.getMailStats({ period: statsPeriod }),
+      auditService.getActionStats({ period: statsPeriod }),
     ]);
 
     res.json({
+      statsPeriod: statsPeriod || 'all',
       stats: {
         users: stats[0],
         ambers: stats[1],

@@ -4,6 +4,7 @@ var mailService = require('../mail/mail.service');
 var pagination = require('../../lib/pagination');
 var quotaService = require('../quota/quota.service');
 var security = require('../../lib/security');
+var timeRange = require('../../lib/time-range');
 
 function getComputedStatus(amber) {
   if (amber.status === 'cancelled' || amber.status === 'opened') {
@@ -219,8 +220,13 @@ exports.archiveAmberForUser = async function archiveAmberForUser(userId, amberId
   return mapAmber(updatedRecord);
 };
 
-exports.getAmberStats = async function getAmberStats() {
-  var ambers = (await amberStore.getAll()).map(mapAmber);
+exports.getAmberStats = async function getAmberStats(options) {
+  var range = timeRange.resolveRange(options && options.period);
+  var ambers = (await amberStore.getAll())
+    .filter(function (amber) {
+      return timeRange.isWithinRange(amber.createdAt, range);
+    })
+    .map(mapAmber);
 
   return {
     totalAmbers: ambers.length,
