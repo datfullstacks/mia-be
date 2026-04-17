@@ -35,7 +35,7 @@ exports.listAmbers = async function listAmbers(req, res, next) {
 
 exports.createAmber = async function createAmber(req, res, next) {
   try {
-    var recipientEmail = req.body.recipientEmail;
+    var recipientEmail = typeof req.body.recipientEmail === 'string' ? req.body.recipientEmail.trim() : '';
     var message = req.body.message;
     var openAt = req.body.openAt;
     var passcode = req.body.passcode;
@@ -63,7 +63,7 @@ exports.createAmber = async function createAmber(req, res, next) {
     var amber = await amberService.createAmber({
       senderUserId: req.currentUser.id,
       isAdmin: Boolean(req.currentUser.isAdmin),
-      recipientEmail: recipientEmail.trim(),
+      recipientEmail: recipientEmail.toLowerCase(),
       message: message.trim(),
       openAt: new Date(openAt).toISOString(),
       createdBy: req.currentUser.name,
@@ -81,7 +81,7 @@ exports.createAmber = async function createAmber(req, res, next) {
 exports.updateAmber = async function updateAmber(req, res, next) {
   try {
     var amberId = req.params.amberId;
-    var recipientEmail = req.body.recipientEmail;
+    var recipientEmail = typeof req.body.recipientEmail === 'string' ? req.body.recipientEmail.trim() : '';
     var message = req.body.message;
     var openAt = req.body.openAt;
     var passcode = req.body.passcode;
@@ -111,7 +111,7 @@ exports.updateAmber = async function updateAmber(req, res, next) {
     }
 
     var amber = await amberService.updateAmberForUser(req.currentUser.id, amberId, {
-      recipientEmail: recipientEmail.trim(),
+      recipientEmail: recipientEmail.toLowerCase(),
       message: message.trim(),
       openAt: new Date(openAt).toISOString(),
       passcode: typeof passcode === 'string' && passcode.trim() ? passcode.trim() : null,
