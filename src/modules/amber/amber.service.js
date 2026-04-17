@@ -29,21 +29,6 @@ function isSelfFutureAmber(payload) {
   );
 }
 
-async function hasAnotherSelfFutureAmber(senderUserId, senderEmail, excludeAmberId) {
-  var normalizedSenderEmail = String(senderEmail || '').toLowerCase();
-
-  return (await amberStore.getAll()).some(function (amber) {
-    return (
-      amber.id !== excludeAmberId &&
-      amber.senderUserId === senderUserId &&
-      amber.recipientEmail === normalizedSenderEmail &&
-      amber.status !== 'cancelled' &&
-      !amber.archivedAt &&
-      isFutureTimestamp(amber.openAt)
-    );
-  });
-}
-
 function matchesSearch(amber, searchTerm) {
   if (!searchTerm) {
     return true;
@@ -133,12 +118,6 @@ exports.listAmbersForUser = async function listAmbersForUser(userId, options) {
 exports.createAmber = async function createAmber(payload) {
   var allowsSelfFutureAmber = isSelfFutureAmber(payload);
 
-  if (allowsSelfFutureAmber && (await hasAnotherSelfFutureAmber(payload.senderUserId, payload.senderEmail))) {
-    var selfAmberError = new Error('You can only keep one future amber addressed to yourself at a time.');
-    selfAmberError.statusCode = 409;
-    throw selfAmberError;
-  }
-
   if (!payload.isAdmin && !allowsSelfFutureAmber) {
     var quota = await quotaService.getQuotaForUser(payload.senderUserId);
 
@@ -170,17 +149,6 @@ exports.createAmber = async function createAmber(payload) {
 
 exports.updateAmberForUser = async function updateAmberForUser(userId, amberId, payload) {
   var amber = await getOwnedAmberForUpdate(userId, amberId);
-  var allowsSelfFutureAmber = isSelfFutureAmber({
-    senderEmail: payload.senderEmail,
-    recipientEmail: payload.recipientEmail,
-    openAt: payload.openAt,
-  });
-
-  if (allowsSelfFutureAmber && (await hasAnotherSelfFutureAmber(userId, payload.senderEmail, amberId))) {
-    var selfAmberError = new Error('You can only keep one future amber addressed to yourself at a time.');
-    selfAmberError.statusCode = 409;
-    throw selfAmberError;
-  }
 
   var updatedRecord = await amberStore.update({
     id: amber.id,
