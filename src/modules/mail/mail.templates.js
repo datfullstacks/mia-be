@@ -9,16 +9,16 @@ function getActionUrl() {
 function getTemplateContent(amber, event) {
   if (event === 'amber_ready') {
     return {
-      title: 'Amber cua ban da den luc mo',
-      body: 'Thoi gian cho da ket thuc. Hay vao MIA va dung thong tin amber ben duoi de mo.',
-      subject: 'MIA amber ' + amber.code + ' da san sang de mo',
+      title: 'Amber của bạn đã đến lúc mở',
+      body: 'Thời gian chờ đã kết thúc. Hãy vào MIA và dùng thông tin amber bên dưới để mở.',
+      subject: 'MIA amber ' + amber.code + ' đã sẵn sàng để mở',
     };
   }
 
   return {
-    title: 'Ban vua nhan duoc mot amber moi',
-    body: 'Co nguoi da luu mot thong diep cho ban trong MIA. Hay giu lai thong tin ben duoi va quay lai dung thoi diem de mo.',
-    subject: 'MIA amber ' + amber.code + ' da duoc tao',
+    title: 'Bạn vừa nhận được một amber mới',
+    body: 'Có người đã lưu một thông điệp cho bạn trong MIA. Hãy giữ lại thông tin bên dưới và quay lại đúng thời điểm để mở.',
+    subject: 'MIA amber ' + amber.code + ' đã được tạo',
   };
 }
 
@@ -26,11 +26,11 @@ exports.renderMailTemplate = function renderMailTemplate(amber, event) {
   var content = getTemplateContent(amber, event);
   var actionUrl = getActionUrl();
   var passcodeSection = amber.passcode
-    ? '\nMat ma mo: ' + amber.passcode
-    : '\nMat ma mo: dung mat ma ban da tao truoc do';
+    ? '\nMật mã mở: ' + amber.passcode
+    : '\nMật mã mở: dùng mật mã bạn đã tạo trước đó';
   var htmlPasscodeSection = amber.passcode
-    ? '<p style="margin:0 0 8px;"><strong>Mat ma mo:</strong> ' + amber.passcode + '</p>'
-    : '<p style="margin:0 0 8px;"><strong>Mat ma mo:</strong> Dung mat ma ban da tao truoc do.</p>';
+    ? '<p style="margin:0 0 8px;"><strong>Mật mã mở:</strong> ' + amber.passcode + '</p>'
+    : '<p style="margin:0 0 8px;"><strong>Mật mã mở:</strong> Dùng mật mã bạn đã tạo trước đó.</p>';
 
   return {
     subject: content.subject,
@@ -38,12 +38,12 @@ exports.renderMailTemplate = function renderMailTemplate(amber, event) {
       content.title +
       '\n\n' +
       content.body +
-      '\n\nMa amber: ' +
+      '\n\nMã amber: ' +
       amber.code +
       passcodeSection +
-      '\nMo vao luc: ' +
+      '\nMở vào lúc: ' +
       amber.openAt +
-      '\nMo amber tai: ' +
+      '\nMở amber tại: ' +
       actionUrl,
     html:
       '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px;">' +
@@ -54,20 +54,20 @@ exports.renderMailTemplate = function renderMailTemplate(amber, event) {
       content.body +
       '</p>' +
       '<div style="margin:0 0 16px;padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;">' +
-      '<p style="margin:0 0 8px;font-size:18px;"><strong>Ma amber:</strong> ' +
+      '<p style="margin:0 0 8px;font-size:18px;"><strong>Mã amber:</strong> ' +
       amber.code +
       '</p>' +
       htmlPasscodeSection +
-      '<p style="margin:8px 0 0;"><strong>Open at:</strong> ' +
+      '<p style="margin:8px 0 0;"><strong>Mở vào lúc:</strong> ' +
       amber.openAt +
       '</p>' +
       '</div>' +
       '<p style="margin:0 0 16px;">' +
       '<a href="' +
       actionUrl +
-      '" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#111827;color:#ffffff;text-decoration:none;">Mo MIA</a>' +
+      '" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#111827;color:#ffffff;text-decoration:none;">Mở MIA</a>' +
       '</p>' +
-      '<p style="margin:0;color:#6b7280;font-size:14px;">Neu nut khong hoat dong, hay mo link nay: ' +
+      '<p style="margin:0;color:#6b7280;font-size:14px;">Nếu nút không hoạt động, hãy mở link này: ' +
       actionUrl +
       '</p>' +
       '</div>',
