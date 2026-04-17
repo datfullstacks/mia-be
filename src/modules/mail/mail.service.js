@@ -1,11 +1,9 @@
 var crypto = require('crypto');
-var getEnv = require('../../config/env');
 var mailStore = require('./mail.store');
 var mailProvider = require('./mail.provider');
 var amberStore = require('../amber/amber.store');
+var mailTemplates = require('./mail.templates');
 var pagination = require('../../lib/pagination');
-
-var env = getEnv();
 
 function mapMailLog(record) {
   return {
@@ -19,48 +17,6 @@ function mapMailLog(record) {
     createdAt: record.createdAt,
     sentAt: record.sentAt,
     errorMessage: record.errorMessage || null,
-  };
-}
-
-function buildMessage(amber, event) {
-  var actionUrl = env.appBaseUrl.replace(/\/$/, '') + '/room?app=unseal';
-  var title = event === 'amber_ready' ? 'Your amber is ready to open' : 'A new amber has been sealed for you';
-  var body =
-    event === 'amber_ready'
-      ? 'The waiting period is over. Visit MIA and enter the amber code below.'
-      : 'Someone sealed a message in MIA for you. Keep the code below and return when it is time.';
-
-  return {
-    subject:
-      event === 'amber_ready'
-        ? 'MIA amber ' + amber.code + ' is ready to open'
-        : 'MIA amber ' + amber.code + ' was sealed',
-    text:
-      title +
-      '\n\n' +
-      body +
-      '\n\nCode: ' +
-      amber.code +
-      '\nOpen at: ' +
-      amber.openAt +
-      '\nUnseal: ' +
-      actionUrl,
-    html:
-      '<h2>' +
-      title +
-      '</h2>' +
-      '<p>' +
-      body +
-      '</p>' +
-      '<p><strong>Code:</strong> ' +
-      amber.code +
-      '</p>' +
-      '<p><strong>Open at:</strong> ' +
-      amber.openAt +
-      '</p>' +
-      '<p><a href="' +
-      actionUrl +
-      '">Open MIA</a></p>',
   };
 }
 
@@ -134,7 +90,7 @@ function filterMailLogs(logs, options) {
 }
 
 exports.logAmberCreated = async function logAmberCreated(amber) {
-  var message = buildMessage(amber, 'amber_created');
+  var message = mailTemplates.renderMailTemplate(amber, 'amber_created');
 
   return mapMailLog(
     await createMailLog({
@@ -178,7 +134,7 @@ exports.processReadyEmails = async function processReadyEmails() {
 
   for (var index = 0; index < processed.length; index += 1) {
     var amber = processed[index];
-    var message = buildMessage(amber, 'amber_ready');
+    var message = mailTemplates.renderMailTemplate(amber, 'amber_ready');
 
     processedLogs.push(
       mapMailLog(
@@ -238,7 +194,7 @@ exports.retryMailLog = async function retryMailLog(mailLogId) {
     throw duplicateError;
   }
 
-  var message = buildMessage(amber, mailLog.event);
+  var message = mailTemplates.renderMailTemplate(amber, mailLog.event);
 
   return mapMailLog(
     await createMailLog({
