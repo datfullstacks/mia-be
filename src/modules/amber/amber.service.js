@@ -143,7 +143,7 @@ exports.createAmber = async function createAmber(payload) {
     archivedAt: null,
   };
   var createdAmber = await amberStore.insert(record);
-  await mailService.logAmberCreated(createdAmber);
+  await mailService.logAmberCreated(createdAmber, payload.passcode);
   return mapAmber(createdAmber);
 };
 

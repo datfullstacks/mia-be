@@ -89,8 +89,17 @@ function filterMailLogs(logs, options) {
     });
 }
 
-exports.logAmberCreated = async function logAmberCreated(amber) {
-  var message = mailTemplates.renderMailTemplate(amber, 'amber_created');
+exports.logAmberCreated = async function logAmberCreated(amber, passcode) {
+  var message = mailTemplates.renderMailTemplate(
+    {
+      id: amber.id,
+      code: amber.code,
+      recipientEmail: amber.recipientEmail,
+      openAt: amber.openAt,
+      passcode: passcode,
+    },
+    'amber_created',
+  );
 
   return mapMailLog(
     await createMailLog({
