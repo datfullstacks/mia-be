@@ -35,6 +35,12 @@ exports.listAmbers = async function listAmbers(req, res, next) {
 
 exports.createAmber = async function createAmber(req, res, next) {
   try {
+    console.log('createAmber payload', {
+      body: req.body,
+      recipientEmailRaw: req.body && req.body.recipientEmail,
+      recipientEmailRawJson: JSON.stringify(req.body && req.body.recipientEmail),
+      recipientEmailType: typeof (req.body && req.body.recipientEmail),
+    });
     var recipientEmail = typeof req.body.recipientEmail === 'string' ? req.body.recipientEmail.trim() : '';
     var message = req.body.message;
     var openAt = req.body.openAt;
