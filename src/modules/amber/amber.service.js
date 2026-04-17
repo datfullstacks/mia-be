@@ -17,6 +17,33 @@ function getComputedStatus(amber) {
   return 'scheduled';
 }
 
+function isFutureTimestamp(value) {
+  return new Date(value).getTime() > Date.now();
+}
+
+function isSelfFutureAmber(payload) {
+  return (
+    Boolean(payload.senderEmail) &&
+    String(payload.recipientEmail || '').toLowerCase() === String(payload.senderEmail || '').toLowerCase() &&
+    isFutureTimestamp(payload.openAt)
+  );
+}
+
+async function hasAnotherSelfFutureAmber(senderUserId, senderEmail, excludeAmberId) {
+  var normalizedSenderEmail = String(senderEmail || '').toLowerCase();
+
+  return (await amberStore.getAll()).some(function (amber) {
+    return (
+      amber.id !== excludeAmberId &&
+      amber.senderUserId === senderUserId &&
+      amber.recipientEmail === normalizedSenderEmail &&
+      amber.status !== 'cancelled' &&
+      !amber.archivedAt &&
+      isFutureTimestamp(amber.openAt)
+    );
+  });
+}
+
 function matchesSearch(amber, searchTerm) {
   if (!searchTerm) {
     return true;
@@ -104,7 +131,15 @@ exports.listAmbersForUser = async function listAmbersForUser(userId, options) {
 };
 
 exports.createAmber = async function createAmber(payload) {
-  if (!payload.isAdmin) {
+  var allowsSelfFutureAmber = isSelfFutureAmber(payload);
+
+  if (allowsSelfFutureAmber && (await hasAnotherSelfFutureAmber(payload.senderUserId, payload.senderEmail))) {
+    var selfAmberError = new Error('You can only keep one future amber addressed to yourself at a time.');
+    selfAmberError.statusCode = 409;
+    throw selfAmberError;
+  }
+
+  if (!payload.isAdmin && !allowsSelfFutureAmber) {
     var quota = await quotaService.getQuotaForUser(payload.senderUserId);
 
     if (quota.remainingCredits < 1) {
@@ -135,6 +170,18 @@ exports.createAmber = async function createAmber(payload) {
 
 exports.updateAmberForUser = async function updateAmberForUser(userId, amberId, payload) {
   var amber = await getOwnedAmberForUpdate(userId, amberId);
+  var allowsSelfFutureAmber = isSelfFutureAmber({
+    senderEmail: payload.senderEmail,
+    recipientEmail: payload.recipientEmail,
+    openAt: payload.openAt,
+  });
+
+  if (allowsSelfFutureAmber && (await hasAnotherSelfFutureAmber(userId, payload.senderEmail, amberId))) {
+    var selfAmberError = new Error('You can only keep one future amber addressed to yourself at a time.');
+    selfAmberError.statusCode = 409;
+    throw selfAmberError;
+  }
+
   var updatedRecord = await amberStore.update({
     id: amber.id,
     code: amber.code,

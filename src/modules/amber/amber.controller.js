@@ -35,12 +35,6 @@ exports.listAmbers = async function listAmbers(req, res, next) {
 
 exports.createAmber = async function createAmber(req, res, next) {
   try {
-    console.log('createAmber payload', {
-      body: req.body,
-      recipientEmailRaw: req.body && req.body.recipientEmail,
-      recipientEmailRawJson: JSON.stringify(req.body && req.body.recipientEmail),
-      recipientEmailType: typeof (req.body && req.body.recipientEmail),
-    });
     var recipientEmail = typeof req.body.recipientEmail === 'string' ? req.body.recipientEmail.trim() : '';
     var message = req.body.message;
     var openAt = req.body.openAt;
@@ -68,6 +62,7 @@ exports.createAmber = async function createAmber(req, res, next) {
 
     var amber = await amberService.createAmber({
       senderUserId: req.currentUser.id,
+      senderEmail: req.currentUser.email,
       isAdmin: Boolean(req.currentUser.isAdmin),
       recipientEmail: recipientEmail.toLowerCase(),
       message: message.trim(),
@@ -117,6 +112,7 @@ exports.updateAmber = async function updateAmber(req, res, next) {
     }
 
     var amber = await amberService.updateAmberForUser(req.currentUser.id, amberId, {
+      senderEmail: req.currentUser.email,
       recipientEmail: recipientEmail.toLowerCase(),
       message: message.trim(),
       openAt: new Date(openAt).toISOString(),
